@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <!-- 1. METADATOS Y ESTILOS. Este documento funciona sin conexión a internet. -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fc">
+  <title>KNN visual · 2D, 3D y caso práctico Iris</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="layout">
+  <header class="hero">
+    <div class="overline"><span class="spark">✳</span> MACHINE LEARNING LAB <span class="separator">/</span> DEMOSTRACIÓN PARA CLASE</div>
+    <h1>KNN: <span>¿quiénes son mis vecinos?</span></h1>
+    <p>Explora <strong>2D y 3D</strong>, cambia el número de clases y observa cómo se calcula la <strong>frontera de decisión</strong>. Después, prueba un caso real: <strong>identificar especies de flores Iris a partir de sus medidas</strong>.</p>
+  </header>
+  <!-- 2. ESCENARIO: laboratorio sintético o datos reales del conocido conjunto Iris. -->
+  <div class="scenario-bar" role="group" aria-label="Escenario didáctico">
+    <button id="freeBtn" class="scenario-btn active" aria-pressed="true"><span class="scenario-icon">✦</span><span><strong>Laboratorio libre</strong><small>Crea clases y mueve ejemplos</small></span></button>
+    <button id="irisBtn" class="scenario-btn" aria-pressed="false"><span class="scenario-icon">✿</span><span><strong>Ejemplo práctico: flores Iris</strong><small>Medidas reales, 3 especies</small></span></button>
+  </div>
+  <div id="caseDescription" class="case-description" hidden>
+    <strong>CASO REAL · CLASIFICACIÓN BOTÁNICA</strong>
+    Una flor nueva llega al laboratorio. Medimos <b>longitud del pétalo</b> (X), <b>anchura del pétalo</b> (Y) y, en 3D, <b>longitud del sépalo</b> (Z). ¿Es <em>setosa</em>, <em>versicolor</em> o <em>virginica</em>? Los ejemplos proceden del conjunto de datos Iris (subconjunto de 45 flores). Las medidas se normalizan para que las escalas sean comparables.
+  </div>
+
+  <div class="workspace">
+    <!-- 3. VISUALIZACIÓN. Canvas 2D dibuja un gráfico bidimensional o una proyección de un espacio de 3 variables. -->
+    <section class="panel graph-panel" aria-labelledby="graphTitle">
+      <div class="panel-heading">
+        <div><div class="eyebrow">GRÁFICO INTERACTIVO</div><h2 id="graphTitle">¿A qué clase pertenece el punto nuevo?</h2></div>
+        <span id="chartStatus" class="tag">● 3 clases · 2D</span>
+      </div>
+      <div id="legend" class="legend" aria-label="Leyenda de colores"></div>
+      <div class="canvas-shell">
+        <canvas id="knnCanvas" tabindex="0" aria-label="Gráfico KNN: arrastra el punto interrogación en 2D; en 3D arrastra el fondo para girar el gráfico."></canvas>
+        <div id="canvasHint" class="canvas-hint">Arrastra puntos o pulsa sobre el gráfico</div>
+        <div id="tooltip" class="tooltip" role="status"></div>
+      </div>
+      <div class="graph-footer">
+        <span>El punto <strong>?</strong> es un dato sin etiqueta. Los círculos de color son ejemplos conocidos.</span>
+        <span id="boundaryIndicator" class="boundary-indicator"><i></i> Frontera activa</span>
+      </div>
+      <div id="axisInfo" class="axis-info">X: característica 1 · Y: característica 2</div>
+    </section>
+
+    <!-- 4. PANEL DE CONTROL. Todos los elementos tienen eventos en app.js. -->
+    <section class="panel controls-panel" aria-label="Controles de KNN">
+      <div class="controls-head"><div class="eyebrow">CONTROLES</div><span class="live">● EN VIVO</span></div>
+      <div class="control-section first-section">
+        <div class="section-heading">Dimensiones</div>
+        <div class="mode-switch" role="group" aria-label="2D o 3D">
+          <button id="view2DBtn" class="mode-button selected" aria-pressed="true">▦ 2D · dos variables</button>
+          <button id="view3DBtn" class="mode-button" aria-pressed="false">⬡ 3D · tres variables</button>
+        </div>
+        <p id="dimensionHint" class="hint">En 2D se calcula d = √(Δx² + Δy²).</p>
+        <div id="orbitTools" class="orbit-tools" hidden>
+          <button id="resetCameraButton" class="secondary-button" type="button">↺ Reiniciar cámara</button>
+          <small>Arrastra el fondo para girar · rueda para zoom</small>
+        </div>
+      </div>
+      <div class="control-section">
+        <div class="section-heading">Tipo de predicción</div>
+        <div class="mode-switch" role="group" aria-label="Clasificación o regresión">
+          <button id="classificationBtn" class="mode-button selected" aria-pressed="true">Clasificación</button>
+          <button id="regressionBtn" class="mode-button" aria-pressed="false">Regresión</button>
+        </div>
+        <p id="regressionNote" class="hint">En clasificación, cada vecino vota por una clase.</p>
+      </div>
+      <div id="classControls" class="control-section">
+        <div class="setting-line">
+          <label for="classSelect"><strong>Número de clases</strong><small>De 2 a 6 clases en modo libre</small></label>
+          <select id="classSelect" aria-label="Número de clases">
+            <option value="2">2 clases</option><option value="3" selected>3 clases</option>
+            <option value="4">4 clases</option><option value="5">5 clases</option><option value="6">6 clases</option>
+          </select>
+        </div>
+        <p id="classHint" class="hint">Cambiar las clases regenera los ejemplos de entrenamiento.</p>
+      </div>
+      <div class="control-section k-section">
+        <div class="setting-line"><div><strong>Número de vecinos</strong><small>Elige K para cambiar la predicción</small></div><span class="knumber">K = <b id="kValue">5</b></span></div>
+        <input id="kSlider" type="range" min="1" max="15" value="5" step="1" aria-label="Número de vecinos K">
+        <div class="range-ends"><span>1 vecino</span><span>15 vecinos</span></div>
+        <p id="kHint" class="hint strong-hint">K pequeño: decisiones locales. K grande: el contexto importa más.</p>
+      </div>
+      <div class="control-section view-section">
+        <div class="section-heading">Regiones y fronteras</div>
+        <label class="check-row"><span id="areasLabel">Colorear regiones predichas</span><input id="areasToggle" type="checkbox" checked></label>
+        <label class="check-row"><span>Mostrar frontera de decisión</span><input id="boundaryToggle" type="checkbox" checked></label>
+        <div id="boundary3DControls" hidden>
+          <label class="mini-label" for="boundary3DMode">¿Cómo ver la frontera en 3D?</label>
+          <select id="boundary3DMode" class="wide-select"><option value="slice">Corte Z · frontera en un plano</option><option value="volume">Superficie 3D aproximada</option></select>
+          <p id="sliceHint" class="hint">La línea oscura es la intersección de la frontera 3D con el plano Z seleccionado.</p>
+          <div id="sliceZRow" class="coordinate-row"><label for="sliceZ">Plano Z</label><input id="sliceZ" type="range" min="0" max="100" step="1" value="50"><output id="sliceZValue">50</output></div>
+        </div>
+      </div>
+      <div class="control-section coordinates-section">
+        <div class="section-heading">Dato nuevo (?)</div>
+        <div class="coordinate-row"><label for="queryX" id="xLabel">X</label><input id="queryX" type="range" min="0" max="100" step="1" value="52"><output id="queryXValue">52</output></div>
+        <div class="coordinate-row"><label for="queryY" id="yLabel">Y</label><input id="queryY" type="range" min="0" max="100" step="1" value="49"><output id="queryYValue">49</output></div>
+        <div class="coordinate-row" id="queryZRow" hidden><label for="queryZ" id="zLabel">Z</label><input id="queryZ" type="range" min="0" max="100" step="1" value="50"><output id="queryZValue">50</output></div>
+        <p class="hint" id="queryHint">Haz clic o arrastra el punto ? para cambiar X e Y.</p>
+      </div>
+      <div id="editSection" class="control-section edit-section">
+        <div class="section-heading">Editar ejemplos</div>
+        <div class="edit-modes"><button id="moveTool" class="tool-button active" aria-pressed="true">Mover punto ?</button><button id="addTool" class="tool-button" aria-pressed="false">+ Añadir ejemplo</button></div>
+        <div id="classPickerContainer" class="class-picker" hidden><small>Clase del ejemplo nuevo:</small><div id="classPicker" class="class-chips"></div></div>
+        <div class="coordinate-row" id="addZRow" hidden><label for="addZ">Z nuevo</label><input id="addZ" type="range" min="0" max="100" step="1" value="50"><output id="addZValue">50</output></div>
+        <div class="action-row"><button id="undoButton" class="text-button" disabled>↶ Deshacer añadido</button><button id="shuffleButton" class="text-button">↻ Nuevos ejemplos</button></div>
+      </div>
+      <!-- 5. RECORRIDO DIDÁCTICO: cálculo, vecinos y votación, con números reales. -->
+      <div class="control-section walkthrough">
+        <div class="step-line"><span>Explicar paso a paso</span><b id="stepCounter">0 / 3</b></div>
+        <div class="step-progress" id="stepProgress"><span></span><span></span><span></span></div>
+        <div class="step-card" aria-live="polite"><div id="stepLabel" class="step-label">PUNTO DE PARTIDA</div><h3 id="stepTitle">¿Quién es el vecino más cercano?</h3><p id="stepDescription">KNN aprende de ejemplos etiquetados.</p></div>
+        <div id="stepDetail" class="step-detail" aria-live="polite"></div>
+        <div class="step-actions"><button id="nextStep" class="primary-button">Mostrar distancias →</button><button id="prevStep" class="secondary-button" disabled>← Atrás</button></div>
+      </div>
+      <button id="resetButton" class="reset-button">↺ Restablecer demostración</button>
+    </section>
+  </div>
+  <section class="concepts" aria-label="Tres pasos de KNN">
+    <article class="concept"><span class="concept-number">01</span><h3>Distancias</h3><p id="formulaExplanation">En 2D: d = √(Δx² + Δy²). En 3D añadimos Δz². Para Iris usamos variables normalizadas.</p></article>
+    <article class="concept"><span class="concept-number">02</span><h3>Vecinos</h3><p>Se comparan las distancias con <strong>todos</strong> los ejemplos y se seleccionan los K más próximos.</p></article>
+    <article class="concept"><span class="concept-number">03</span><h3>Predicción</h3><p>Clasificación: gana la clase con más votos. Regresión: se obtiene la media de los valores de los vecinos.</p></article>
+  </section>
+  <p id="teacherTip" class="teacher-tip"><strong>Pregunta para clase:</strong> compara K = 1 con K = 11. ¿Cómo cambian las regiones? Activa 3D y mueve Z para demostrar que una tercera variable puede cambiar los vecinos.</p>
+</main>
+<!-- 6. JS separado y comentado; no requiere librerías de terceros. -->
+<script src="app.js"></script>
+</body>
+</html>
