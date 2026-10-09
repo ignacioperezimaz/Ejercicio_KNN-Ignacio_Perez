@@ -26,8 +26,7 @@
   </div>
 
   <div class="workspace">
-    <!-- Columna visual: gráfico, explicación instantánea y teoría breve.
-         Al estar juntos, el contenido ocupa el espacio que antes quedaba vacío. -->
+    <!-- Columna visual: gráfico + explicación instantánea (sin tarjetas redundantes debajo). -->
     <div class="visual-column">
     <!-- 3. VISUALIZACIÓN. Canvas 2D dibuja un gráfico bidimensional o una proyección de un espacio de 3 variables. -->
     <section class="panel graph-panel" aria-labelledby="graphTitle">
@@ -63,12 +62,6 @@
       <div id="stepDetail" class="step-detail" aria-live="polite" hidden></div>
     </section>
 
-    <!-- Recordatorios teóricos que ahora rellenan la columna del gráfico. -->
-    <section class="concepts" aria-label="Tres operaciones de KNN">
-      <article class="concept"><span class="concept-number">01</span><h3>Distancias</h3><p id="formulaExplanation">En 2D: d = √(Δx² + Δy²). En 3D añadimos Δz². Para Iris usamos variables normalizadas.</p></article>
-      <article class="concept"><span class="concept-number">02</span><h3>Vecinos</h3><p>Se comparan las distancias con <strong>todos</strong> los ejemplos y se seleccionan los K más próximos.</p></article>
-      <article class="concept"><span class="concept-number">03</span><h3>Predicción</h3><p>Clasificación: gana la clase con más votos. Regresión: se obtiene la media de los valores de los vecinos.</p></article>
-    </section>
     </div>
 
     <!-- 4. PANEL DE CONTROL. Todos los elementos tienen eventos en app.js. -->
@@ -142,7 +135,6 @@
       <button id="resetButton" class="reset-button">↺ Restablecer demostración</button>
     </section>
   </div>
-  <p id="teacherTip" class="teacher-tip"><strong>Pregunta para clase:</strong> compara K = 1 con K = 11. ¿Cómo cambian las regiones? Activa 3D y mueve Z para demostrar que una tercera variable puede cambiar los vecinos.</p>
 </main>
 <!-- 6. JS separado y comentado; no requiere librerías de terceros. -->
 <script src="app.js"></script>

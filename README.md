@@ -1,3 +1,8 @@
+# KNN interactivo en 2D y 3D — código comentado y explicación de cada bloque
+
+## Prompts originales utilizados para crear y mejorar este proyecto
+
+A continuación se recogen **literalmente, en orden cronológico**, los mensajes que me has dado durante esta conversación para crear y modificar el proyecto. Se conserva la redacción original (incluidas las faltas de ortografía).
 
 ### Prompt 1 — Crear una explicación visual de KNN
 
@@ -32,4 +37,15 @@
 
 > ahora quiero que le añadas un circulo con los que tiene en cuenta
 
----
+### Prompt 8 — Retirar tarjetas y pregunta inferiores
+
+> quiero que me quites esto de abajo:
+
+*El mensaje incluía una captura de las tres tarjetas de resumen y de la franja «Pregunta para clase». Ambas se eliminaron. Se conserva la explicación completa al pulsar un solo botón.*
+
+### Prompt 9 — Igualar los márgenes inferiores de ambos paneles
+
+> uniformiza los margenes para que terminen a la misma altura
+
+*Este mensaje incluía una captura con el bloque de explicación a distinta altura que el panel de controles. Se han alineado sus bordes inferiores en escritorio, sin deformar la geometría 2D.*
+

@@ -467,9 +467,38 @@
     canvas.classList.toggle('is-2d',!three);
     canvas.classList.toggle('is-3d',three);
     $('axisInfo').textContent=iris?'X = longitud pétalo (cm) · Y = anchura pétalo (cm) · Z = longitud sépalo (cm)':'X = característica 1 · Y = característica 2 · Z = característica 3';
-    $('formulaExplanation').innerHTML=three?'En <strong>3D</strong>: d = √(Δx² + Δy² + Δz²). La tercera característica afecta a los vecinos.':'En <strong>2D</strong>: d = √(Δx² + Δy²). Sólo comparamos dos características.';
-    $('teacherTip').innerHTML=iris?'<strong>Ejemplo para clase:</strong> tenemos una flor nueva con medidas 4,7 cm de pétalo, 1,4 cm de anchura y 6,1 cm de sépalo. Prueba K = 1 y K = 9, activa 3D y descubre si la especie predicha cambia.':'<strong>Pregunta para clase:</strong> compara K = 1 con K = 11. ¿Cómo cambian las regiones? Activa 3D y mueve Z: ¿podría cambiar la etiqueta al añadir una tercera característica?';
-    renderCoords();renderLegend();renderPicker();renderSteps();queueDraw();
+    renderCoords();renderLegend();renderPicker();renderSteps();
+    // Ajustamos la altura DESPUÉS de actualizar todos los controles visibles.
+    alignBottomEdges();
+    queueDraw();
+  }
+
+  // G0. SINCRONIZACIÓN DE ALTURAS EN ESCRITORIO.
+  // Grid estira las dos columnas al mismo borde inferior. En 2D nunca tocamos
+  // la altura del canvas, porque modificar su aspecto deformaría el círculo.
+  // En 3D sí podemos ampliar el lienzo. Para evitar un bucle de ResizeObserver
+  // empezamos siempre midiendo desde una altura fija de 515 píxeles, y después
+  // asignamos UNA ÚNICA altura final, calculada a partir del panel de controles.
+  function alignBottomEdges(){
+    if(state.dims!==3 || window.innerWidth<=1050){
+      canvas.style.removeProperty('height');
+      return;
+    }
+    const visual=document.querySelector('.visual-column');
+    const controls=document.querySelector('.controls-panel');
+    // Medimos la altura natural de ambas columnas con el lienzo 3D estándar.
+    canvas.style.height='515px';
+    // La explicación usa flex:1 cuando sobra altura; para medir su tamaño
+    // REAL quitamos temporalmente esa expansión (si no, el extra sería 0).
+    const explanation=document.querySelector('.explanation-panel');
+    explanation.style.flex='0 0 auto';
+    const gap=parseFloat(getComputedStyle(visual).gap)||0;
+    const graphH=document.querySelector('.graph-panel').getBoundingClientRect().height;
+    const explanationH=explanation.getBoundingClientRect().height;
+    const leftNatural=graphH+gap+explanationH;
+    const extra=Math.max(0,controls.getBoundingClientRect().height-leftNatural);
+    canvas.style.height=`${515+extra}px`;
+    explanation.style.removeProperty('flex');
   }
 
   // G1. Cambio de escenario, dimensionalidad y modos.
@@ -560,6 +589,8 @@
   // G4. Responsive: el canvas tiene resolución adecuada en pantallas retina.
   function resize(){const b=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
     screen.w=b.width;screen.h=b.height;screen.dpr=dpr;canvas.width=Math.max(1,Math.round(b.width*dpr));canvas.height=Math.max(1,Math.round(b.height*dpr));ctx.setTransform(dpr,0,0,dpr,0,0);twoDCache=null;queueDraw();}
+  // Si cambia el ancho del navegador, volvemos a sincronizar los paneles.
+  window.addEventListener('resize',alignBottomEdges);
   resetQuery();makeFree();renderUI();
   if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize);
   resize();

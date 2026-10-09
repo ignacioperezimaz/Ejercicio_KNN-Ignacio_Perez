@@ -115,16 +115,7 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
 .secondary-button:disabled { opacity: .4; cursor: not-allowed; }
 .reset-button { margin-top: 15px; background: none; border: 0; padding: 2px 0; font-size: 11px; font-weight: 800; color: #6884c6; text-decoration: underline; text-underline-offset: 3px; }
 
-/* 7. PIE DIDÁCTICO: teoría resumida para usar en una presentación. */
-.concepts { margin-top: 20px; display: grid; grid-template-columns: repeat(3,1fr); gap: 13px; }
-.concept { background: white; border: 1px solid var(--line); padding: 18px 20px; border-radius: 16px; }
-.concept-number { color: #5b80e4; background: #eff3ff; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; font-size: 11px; font-weight: 900; }
-.concept h3 { font-size: 14px; margin: 12px 0 7px; }
-.concept p { color: #8492a9; font-size: 12px; line-height: 1.65; margin: 0; }
-.teacher-tip { background: #e9efff; border: 1px solid #dce6ff; color: #536784; border-radius: 13px; padding: 15px 19px; margin-top: 14px; font-size: 12.5px; line-height: 1.6; }
-.teacher-tip strong { color: #345078; }
-
-/* 7.1. EXPLICACIÓN DE UNA SOLA PULSACIÓN.
+/* 7. EXPLICACIÓN DE UNA SOLA PULSACIÓN.
    Tres operaciones simultáneas: las distancias, los vecinos elegidos y
    la votación/media. No utilizamos carrusel ni botones de anterior/siguiente. */
 .explanation-panel { padding: 21px 23px 23px; overflow: visible; }
@@ -151,7 +142,6 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
 .explain-prediction .result-card { margin: 0; }
 .explain-votes { min-width: 0; }
 .explain-votes .vote-row { margin: 5px 0; grid-template-columns: minmax(78px,95px) 1fr 20px; }
-.visual-column .concepts { margin-top: 0; }
 
 /* 8. DISEÑO RESPONSIVE: una columna cuando la pantalla es estrecha. */
 @media (max-width: 1050px) { .workspace { grid-template-columns: 1fr; } }
@@ -163,7 +153,6 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
   .canvas-shell { margin: 3px 8px 0; } #knnCanvas { height: 350px; }
   .canvas-hint { top: 6px; right: 6px; padding: 6px; font-size: 9px; }
   .graph-footer { padding: 14px; } .controls-panel { padding: 17px 15px; }
-  .concepts { grid-template-columns: 1fr; } .concept { padding: 16px; }
   .explanation-panel { padding: 17px 15px; }
   .explanation-top { flex-direction: column; }
   .explain-grid { grid-template-columns: 1fr; }
@@ -223,3 +212,28 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
 .neighborhood-description { margin:0 0 13px; }
 .radius-note { margin:11px 0;background:#f2efff;border:1px solid #d9d3fa;color:#5e52ad;border-radius:9px;padding:10px;font-weight:750;line-height:1.55; }
 @media (max-width:660px) { #knnCanvas.is-3d { height:360px; } }
+
+/* 13. ALINEACIÓN DEL BORDE INFERIOR DE LAS DOS COLUMNAS.
+   - En escritorio Grid estira ambas columnas hasta la misma línea final.
+   - En 2D el lienzo se mantiene cuadrado: NO deformamos las distancias
+     ni el círculo euclídeo. El panel explicativo utiliza el espacio restante.
+   - En 3D el lienzo sí puede crecer verticalmente, para aprovechar el espacio
+     en vez de crear una gran tarjeta blanca vacía.
+   - En móvil vuelve el apilamiento natural, sin alturas forzadas. */
+@media (min-width: 1051px) {
+  .workspace { align-items: stretch; }
+  .visual-column { height: 100%; }
+  .explanation-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .controls-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  /* En 3D la altura adicional se aplica desde app.js según los controles;
+     en 2D el canvas continúa siendo cuadrado para preservar el círculo. */
+}
