@@ -28,6 +28,9 @@ h1 span { color: #4778ee; }
 .hero p { margin: 0; max-width: 850px; font-size: 15px; color: var(--muted); line-height: 1.7; }
 .hero p strong { color: #4c607f; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(365px, .9fr); gap: 18px; align-items: start; }
+/* La columna izquierda apila contenidos debajo del gráfico: ya no queda un
+   rectángulo vacío cuando los controles de la derecha son más altos. */
+.visual-column { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .panel { background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; }
 .panel-heading { padding: 25px 24px 11px; display: flex; justify-content: space-between; align-items: center; gap: 14px; }
 .panel-heading h2 { font-size: 19px; margin: 5px 0; letter-spacing: -.025em; }
@@ -121,8 +124,38 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
 .teacher-tip { background: #e9efff; border: 1px solid #dce6ff; color: #536784; border-radius: 13px; padding: 15px 19px; margin-top: 14px; font-size: 12.5px; line-height: 1.6; }
 .teacher-tip strong { color: #345078; }
 
+/* 7.1. EXPLICACIÓN DE UNA SOLA PULSACIÓN.
+   Tres operaciones simultáneas: las distancias, los vecinos elegidos y
+   la votación/media. No utilizamos carrusel ni botones de anterior/siguiente. */
+.explanation-panel { padding: 21px 23px 23px; overflow: visible; }
+.explanation-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.explanation-top h2 { margin: 6px 0 4px; font-size: 19px; letter-spacing: -.03em; }
+.explanation-top .hint { margin: 4px 0 0; font-size: 12px; }
+.explanation-tag { flex: none; padding: 7px 9px; border-radius: 9px; font-size: 10px; font-weight: 900; letter-spacing: .05em; color: #5376bd; background: #eef3ff; }
+.explanation-trigger { width: 100%; margin-top: 15px; padding: 14px 18px; font-size: 13px; }
+.explanation-trigger[aria-expanded="true"] { background: #f0f5ff; color: #3b61b7; border-color: #c5d4fb; }
+.explanation-panel .step-detail { padding: 15px 0 0; }
+.explanation-panel .step-detail[hidden] { display: none; }
+.explain-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.explain-stage { background: #fafcff; border: 1px solid #e3eaf7; border-radius: 13px; padding: 15px; min-width: 0; }
+.explain-stage:last-child { grid-column: 1 / -1; }
+.explain-eyebrow { font-size: 10px; color: #607ec4; letter-spacing: .13em; font-weight: 900; }
+.explain-stage h3 { margin: 7px 0 8px; font-size: 15px; }
+.explain-stage p { margin: 5px 0 10px; line-height: 1.5; color: #6e7f9b; font-size: 11.5px; }
+.explain-stage .dist-row { padding: 5px 0; font-size: 11.5px; }
+.explain-math { padding: 8px 10px; border-radius: 8px; background: #edf4ff; color: #345a99; font-size: 12px; font-weight: 800; }
+.explain-neighbors { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 13px; }
+.explain-neighbors .dist-row { min-width: 0; }
+.explain-neighbors .dist-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.explain-prediction { display: grid; grid-template-columns: minmax(180px, .75fr) minmax(0,1fr); gap: 12px; align-items: center; }
+.explain-prediction .result-card { margin: 0; }
+.explain-votes { min-width: 0; }
+.explain-votes .vote-row { margin: 5px 0; grid-template-columns: minmax(78px,95px) 1fr 20px; }
+.visual-column .concepts { margin-top: 0; }
+
 /* 8. DISEÑO RESPONSIVE: una columna cuando la pantalla es estrecha. */
 @media (max-width: 1050px) { .workspace { grid-template-columns: 1fr; } }
+@media (max-width: 1050px) { .visual-column { gap: 14px; } }
 @media (max-width: 660px) {
   .layout { padding: 20px 11px 32px; } .overline { font-size: 9px; gap: 6px; }
   .panel { border-radius: 16px; } .panel-heading { padding: 17px 14px 8px; }
@@ -131,6 +164,12 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
   .canvas-hint { top: 6px; right: 6px; padding: 6px; font-size: 9px; }
   .graph-footer { padding: 14px; } .controls-panel { padding: 17px 15px; }
   .concepts { grid-template-columns: 1fr; } .concept { padding: 16px; }
+  .explanation-panel { padding: 17px 15px; }
+  .explanation-top { flex-direction: column; }
+  .explain-grid { grid-template-columns: 1fr; }
+  .explain-stage:last-child { grid-column: auto; }
+  .explain-prediction { grid-template-columns: 1fr; }
+  .explain-neighbors { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 
@@ -172,3 +211,15 @@ input[type=range] { width: 100%; margin: 19px 0 9px; accent-color: #4f7bea; curs
 #orbitTools[hidden],#boundary3DControls[hidden],#sliceZRow[hidden],#queryZRow[hidden],#addZRow[hidden],#classPickerContainer[hidden],#editSection[hidden],#classControls[hidden],#caseDescription[hidden]{display:none!important}
 #knnCanvas{height:515px;background:radial-gradient(ellipse at 50% 40%,#fff,#f9fbff)}
 @media(max-width:660px){.scenario-bar{grid-template-columns:1fr}.scenario-btn{padding:13px}.coordinate-row{grid-template-columns:65px minmax(0,1fr) 58px}#knnCanvas{height:360px}.axis-info{padding:12px 14px}}
+
+/* 12. VECINDAD K: círculo matemático en 2D y esfera proyectada en 3D.
+   En 2D el canvas es cuadrado y ambos ejes tienen la misma escala visual,
+   por lo que d_K se dibuja como un CÍRCULO auténtico, no una elipse. */
+#knnCanvas.is-2d { width:100%; height:auto; aspect-ratio:1/1; }
+#knnCanvas.is-3d { width:100%; height:515px; aspect-ratio:auto; }
+.legend-neighborhood { width:22px;height:17px;display:inline-block;border:2px dashed #675ad6;background:rgba(99,88,226,.09);border-radius:50%; }
+.neighborhood-switch { margin-bottom:6px; }
+.radius-information { margin:0 0 5px;color:#584bbb;font-size:11.5px;font-weight:850;line-height:1.5; }
+.neighborhood-description { margin:0 0 13px; }
+.radius-note { margin:11px 0;background:#f2efff;border:1px solid #d9d3fa;color:#5e52ad;border-radius:9px;padding:10px;font-weight:750;line-height:1.55; }
+@media (max-width:660px) { #knnCanvas.is-3d { height:360px; } }

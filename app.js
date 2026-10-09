@@ -47,8 +47,9 @@
   // A3. Estado: fuente única de verdad para todas las interacciones.
   const state = {
     scenario:'free', mode:'classification', dims:2, classCount:3,
+    // step: 0 = explicación oculta; 3 = todas las operaciones visibles juntas.
     k:5, points:[], query:{x:52,y:49,z:50}, step:0,
-    showAreas:true, showBorders:true, boundary3D:'slice', sliceZ:50,
+    showAreas:true, showBorders:true, showNeighborhood:true, boundary3D:'slice', sliceZ:50,
     tool:'move', selectedClass:0, seed:3, hovered:-1, dragging:null,
     yaw:-.74, pitch:.43, zoom:1
   };
@@ -88,6 +89,20 @@
     return {nearest,winner,votes,distances};
   }
 
+  // B4. Región de vecindad: su radio es la distancia al K-ésimo vecino.
+  // NO escogemos todos los puntos que queden en un radio arbitrario:
+  // primero elegimos exactamente K; después representamos ese radio.
+  // En un empate exacto podría haber otros puntos sobre la circunferencia,
+  // pero sólo los K elementos devueltos por predict() cuentan para votar.
+  function getNeighborhood(query=state.query) {
+    const nearest=predict(query).nearest;
+    return {
+      radius:nearest.length?nearest[nearest.length-1].d:0,
+      indices:nearest.map(n=>n.index),
+      count:nearest.length
+    };
+  }
+
   // C1. Datos SINTÉTICOS didácticos para el laboratorio libre.
   // Los grupos se generan en x,y,z (cada clase tiene siete muestras).
   function makeFree(){
@@ -120,7 +135,12 @@
   }
 
   // D1. Correspondencia entre coordenadas matemáticas y píxeles (2D).
-  function rect(){return {x:48,y:20,w:Math.max(10,screen.w-75),h:Math.max(10,screen.h-77)};}
+  // Para que el círculo matemático se vea circular, la escala visual de X e Y
+  // es exactamente la misma (el área del gráfico es cuadrada en 2D).
+  function rect(){
+    const side=Math.max(10,Math.min(screen.w-77,screen.h-77));
+    return {x:(screen.w-side)/2,y:20,w:side,h:side};
+  }
   function to2D(p){let a=rect();return {x:a.x+p.x*a.w/100,y:a.y+(100-p.y)*a.h/100};}
   function from2D(px,py){let a=rect();return {x:clamp((px-a.x)*100/a.w,0,100),y:clamp(100-(py-a.y)*100/a.h,0,100)};}
   function line(a,b,color,width=1,dash=[]){ctx.save();ctx.beginPath();ctx.setLineDash(dash);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();}
@@ -169,16 +189,46 @@
     else if(label){ctx.fillStyle='#fff';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,p.x,p.y);}
     ctx.restore();
   }
+  // D4. Circunferencia de vecindad con radio hasta el K-ésimo ejemplo.
+  // En 2D la distancia es √(Δx²+Δy²): NO depende de la clase ni de la frontera.
+  function drawNeighborhood2D(query, radius, k) {
+    const a=rect(),q=to2D(query),r=radius*a.w/100;
+    ctx.save();
+    ctx.beginPath();ctx.rect(a.x,a.y,a.w,a.h);ctx.clip();
+    ctx.beginPath();ctx.arc(q.x,q.y,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(99,88,226,.085)';ctx.fill();
+    ctx.setLineDash([10,6]);ctx.strokeStyle='#6659d9';ctx.lineWidth=2.8;ctx.stroke();
+    ctx.restore();
+    // La etiqueta explica el tamaño, que varía si cambia K o la consulta.
+    drawRadiusLabel(`K = ${k} · radio = ${radius.toFixed(1)}`,a.x+12,a.y+10);
+  }
+  function drawRadiusLabel(label,x,y) {
+    ctx.save();ctx.font='bold 11px system-ui';
+    const w=ctx.measureText(label).width+22;
+    ctx.fillStyle='rgba(255,255,255,.96)';ctx.strokeStyle='#bcb6f7';ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(x,y,w,28,9);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#584bbb';ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillText(label,x+11,y+14);ctx.restore();
+  }
+
   function draw2D(){
     const a=rect(),q=to2D(state.query),neighbors=sortedNeighbors(state.query),pred=predict(state.query);
     if(state.showAreas||(state.showBorders&&state.mode==='classification')){
       ctx.save();ctx.beginPath();ctx.rect(a.x,a.y,a.w,a.h);ctx.clip();ctx.drawImage(build2DMap(),a.x,a.y);ctx.restore();
     }
     draw2DAxes();
-    if(state.step===1)neighbors.forEach(n=>line(q,to2D(n.point),'#9cadc977',1,[4,5]));
+    // El círculo siempre marca el radio de los K ejemplos utilizados,
+    // incluso antes de abrir la explicación detallada.
+    if(state.showNeighborhood){
+      const region=getNeighborhood();
+      if(region.count)drawNeighborhood2D(state.query,region.radius,region.count);
+    }
+    // Un clic muestra TODAS las distancias (tenues) y destaca los K vecinos.
+    // Se dibujan primero las líneas tenues para no tapar las destacadas.
+    if(state.step===3)neighbors.forEach(n=>line(q,to2D(n.point),'#849bc43a',.8,[4,5]));
     if(state.step>=2)pred.nearest.forEach(n=>line(q,to2D(n.point),state.mode==='classification'?hexRGBA(COLORS[n.point.c],.76):'#6589af',2.3));
     const selection=new Set(pred.nearest.map(n=>n.index));
-    state.points.forEach((p,i)=>drawPoint(to2D(p),state.mode==='classification'?COLORS[p.c]:regressionColor(p.v),state.step>=2&&selection.has(i),false,state.mode==='regression'?p.v.toFixed(0):''));
+    state.points.forEach((p,i)=>drawPoint(to2D(p),state.mode==='classification'?COLORS[p.c]:regressionColor(p.v),(state.step>=2||state.showNeighborhood)&&selection.has(i),false,state.mode==='regression'?p.v.toFixed(0):''));
     drawPoint(q,state.step===3?(state.mode==='classification'?COLORS[pred.winner]:'#10a886'):'#2b3d5b',true,true);
   }
 
@@ -188,9 +238,10 @@
     let x=p.x-50,y=p.y-50,z=p.z-50,cy=Math.cos(state.yaw),sy=Math.sin(state.yaw);
     const xx=x*cy+z*sy,zz=-x*sy+z*cy,cp=Math.cos(state.pitch),sp=Math.sin(state.pitch);
     const yy=y*cp+zz*sp,depth=-y*sp+zz*cp;
-    const scale=Math.min(screen.w*.0057,screen.h*.0064)*state.zoom;
+    const scale=projectionScale();
     return {x:screen.w*.50+xx*scale,y:screen.h*.51-yy*scale,depth};
   }
+  function projectionScale(){return Math.min(screen.w*.0057,screen.h*.0064)*state.zoom;}
   function corners(){return [[0,0,0],[100,0,0],[0,100,0],[100,100,0],[0,0,100],[100,0,100],[0,100,100],[100,100,100]].map(([x,y,z])=>project({x,y,z}));}
   function draw3DBox(){
     const c=corners(),edge=[[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];
@@ -241,7 +292,36 @@
     }
     volumeCache=faces;return faces;
   }
-  // E4. Pintor por profundidad: los objetos más lejanos se dibujan primero.
+  // E4. En 3D el análogo de la circunferencia es una ESFERA de radio d_K:
+  // (x-qx)²+(y-qy)²+(z-qz)² = d_K². Su silueta se proyecta circular.
+  // Los tres aros de referencia ayudan a percibir su volumen al girar.
+  // La silueta de una esfera NO es la frontera de decisión de KNN.
+  function drawNeighborhood3D(query,radius,k){
+    const q=project(query),r=radius*projectionScale();
+    ctx.save();
+    ctx.beginPath();ctx.arc(q.x,q.y,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(99,88,226,.065)';ctx.fill();
+    ctx.strokeStyle='#675ad6';ctx.lineWidth=2.7;ctx.setLineDash([10,6]);ctx.stroke();
+    ctx.setLineDash([]);
+    // Tres secciones circulares ortogonales proyectadas (planos XY, XZ, YZ).
+    for(const plane of ['xy','xz','yz']){
+      ctx.beginPath();
+      for(let i=0;i<=80;i++){
+        const t=i*2*Math.PI/80,u=radius*Math.cos(t),v=radius*Math.sin(t);
+        const p={...query};
+        if(plane==='xy'){p.x+=u;p.y+=v;}
+        if(plane==='xz'){p.x+=u;p.z+=v;}
+        if(plane==='yz'){p.y+=u;p.z+=v;}
+        const s=project(p);
+        if(i===0)ctx.moveTo(s.x,s.y);else ctx.lineTo(s.x,s.y);
+      }
+      ctx.strokeStyle='rgba(103,90,214,.36)';ctx.lineWidth=1.1;ctx.stroke();
+    }
+    ctx.restore();
+    drawRadiusLabel(`K = ${k} · radio 3D = ${radius.toFixed(1)}`,17,16);
+  }
+
+  // E5. Pintor por profundidad: los objetos más lejanos se dibujan primero.
   // Así se pueden ver los puntos y las fronteras de forma rotatoria sin WebGL.
   function draw3D(){
     const things=[],q=project(state.query),prediction=predict(state.query),selection=new Set(prediction.nearest.map(n=>n.index));
@@ -249,38 +329,52 @@
       if(state.boundary3D==='volume'&&state.mode==='classification'){
         for(const cell of buildVolume()){
           const pp=cell.quad.map(project),d=pp.reduce((s,p)=>s+p.depth,0)/4;
-          things.push({depth:d,draw:()=>polygon(pp,state.showAreas?hexRGBA(COLORS[cell.label],.23):null,state.showBorders?'#33445b35':null,.6)});
+          things.push({depth:d,layer:'background',draw:()=>polygon(pp,state.showAreas?hexRGBA(COLORS[cell.label],.23):null,state.showBorders?'#33445b35':null,.6)});
         }
       }else{
         for(const cell of buildSlice()){
           const pp=cell.quad.map(project),d=pp.reduce((s,p)=>s+p.depth,0)/4;
-          things.push({depth:d,draw:()=>{
+          things.push({depth:d,layer:'background',draw:()=>{
             if(state.showAreas)polygon(pp,state.mode==='classification'?hexRGBA(COLORS[cell.label],.26):regressionColor(cell.label,.28));
             if(state.showBorders)cell.segments.forEach(seg=>{const a=project(seg[0]),b=project(seg[1]);line(a,b,'#fff',4);line(a,b,'#243a56',2.3);});
           }});
         }
       }
     }
-    // Distancias en 3D: líneas que unen las proyecciones de los puntos 3D.
+    // Distancias en 3D: todas las líneas tenues y los K vecinos destacados.
+    if(state.step===3){
+      for(const n of sortedNeighbors(state.query)){
+        const p=project(n.point);
+        things.push({depth:(p.depth+q.depth)/2-.01,draw:()=>line(q,p,'#849bc43a',.7,[4,5])});
+      }
+    }
     const connections=state.step===1?sortedNeighbors(state.query):state.step>=2?prediction.nearest:[];
     for(const n of connections){const p=project(n.point);const col=state.step===1?'#9aacca77':COLORS[n.point.c]+'bb';
       things.push({depth:(p.depth+q.depth)/2,draw:()=>line(q,p,col,state.step===1?1:2,state.step===1?[4,5]:[])});
     }
     state.points.forEach((p,i)=>{
       const s=project(p),color=state.mode==='classification'?COLORS[p.c]:regressionColor(p.v);
-      things.push({depth:s.depth+.01,draw:()=>drawPoint(s,color,state.step>=2&&selection.has(i),false,state.mode==='regression'?p.v.toFixed(0):'')});
+      things.push({depth:s.depth+.01,draw:()=>drawPoint(s,color,(state.step>=2||state.showNeighborhood)&&selection.has(i),false,state.mode==='regression'?p.v.toFixed(0):'')});
     });
     things.push({depth:q.depth+.1,draw:()=>drawPoint(q,state.step===3?(state.mode==='classification'?COLORS[prediction.winner]:'#10a886'):'#2b3d5b',true,true)});
     ctx.font='bold 11px system-ui';draw3DBox();
-    things.sort((a,b)=>a.depth-b.depth).forEach(a=>a.draw());
+    // Primero mostramos las superficies 3D (fondo), después la esfera K,
+    // y por encima las conexiones y puntos para que sigan siendo legibles.
+    things.sort((a,b)=>a.depth-b.depth);
+    for(const item of things.filter(item=>item.layer==='background'))item.draw();
+    if(state.showNeighborhood){
+      const region=getNeighborhood();
+      if(region.count)drawNeighborhood3D(state.query,region.radius,region.count);
+    }
+    for(const item of things.filter(item=>item.layer!=='background'))item.draw();
     ctx.save();ctx.font='bold 12px system-ui';ctx.fillStyle='#7083a0';ctx.textAlign='left';
     ctx.fillText('X, Y, Z representan características (no el valor predicho)',14,screen.h-13);ctx.restore();
   }
   function queueDraw(){if(raf)return;raf=true;requestAnimationFrame(()=>{raf=false;if(screen.w<20)return;ctx.clearRect(0,0,screen.w,screen.h);state.dims===2?draw2D():draw3D();});}
 
-  // F1. Leyenda, coordenadas, y datos de la explicación de los tres pasos.
+  // F1. Leyenda, coordenadas y explicación completa mediante un solo clic.
   function renderLegend(){
-    $('legend').innerHTML=(state.mode==='classification'?names().slice(0,state.classCount).map((n,i)=>`<span class="legend-item"><i class="legend-dot" style="--dot-color:${COLORS[i]}"></i>${n}</span>`):'<span class="legend-item">Valor bajo → valor alto</span>')+'<span class="legend-item"><i class="legend-query">?</i>Flor / dato nuevo</span>';
+    $('legend').innerHTML=(state.mode==='classification'?names().slice(0,state.classCount).map((n,i)=>`<span class="legend-item"><i class="legend-dot" style="--dot-color:${COLORS[i]}"></i>${n}</span>`):'<span class="legend-item">Valor bajo → valor alto</span>')+'<span class="legend-item"><i class="legend-query">?</i>Flor / dato nuevo</span>'+(state.showNeighborhood?'<span class="legend-item"><i class="legend-neighborhood"></i>Radio de los K vecinos</span>':'');
   }
   function renderPicker(){
     $('classPicker').innerHTML=names().slice(0,state.classCount).map((n,i)=>`<button type="button" class="class-chip ${state.selectedClass===i?'active':''}" data-c="${i}"><i class="mini-dot" style="--chip-color:${COLORS[i]}"></i>${state.scenario==='iris'?n:'Clase '+(i+1)}</button>`).join('');
@@ -293,28 +387,44 @@
     $('addZValue').textContent=$('addZ').value;
   }
   function renderSteps(){
-    let pred=predict(state.query),near=pred.nearest,labels=['PUNTO DE PARTIDA','PASO 1 · DISTANCIAS','PASO 2 · VECINOS','PASO 3 · RESULTADO'];
-    const descriptions=[
-      'Tenemos ejemplos conocidos y un dato nuevo. ¿De qué clase será?',
-      `Medimos la distancia euclídea en ${state.dims}D del dato nuevo a cada uno de los ${state.points.length} ejemplos.`,
-      `Ordenamos las distancias y nos quedamos con los ${near.length} vecinos más próximos.`,
-      state.mode==='classification'?'Cada vecino vota. Gana la clase con más votos.':'Promediamos los valores de los vecinos seleccionados.'
-    ];
-    const titles=['¿Quiénes serán sus vecinos?','Calculamos las distancias',`Seleccionamos K = ${state.k}`,'¡Predicción completada!'];
-    $('stepCounter').textContent=`${state.step} / 3`;$('stepLabel').textContent=labels[state.step];
-    $('stepTitle').textContent=titles[state.step];$('stepDescription').textContent=descriptions[state.step];
-    $('stepProgress').querySelectorAll('span').forEach((el,i)=>el.classList.toggle('done',state.step>i));
-    if(state.step===0)$('stepDetail').innerHTML='<div class="empty-detail">Pulsa «Mostrar distancias» para comenzar.</div>';
-    if(state.step===1)$('stepDetail').innerHTML='<div class="detail-label">LOS TRES EJEMPLOS MÁS CERCANOS</div>'+sortedNeighbors(state.query).slice(0,3).map((n,i)=>`<div class="dist-row"><span>${i+1}. ${state.mode==='classification'?names()[n.point.c]:'Valor '+n.point.v.toFixed(1)}</span><strong>d = ${n.d.toFixed(2)}</strong></div>`).join('')+'<p class="hint">Las distancias se muestran en unidades normalizadas (0–100).</p>';
-    if(state.step===2)$('stepDetail').innerHTML='<div class="detail-label">VECINOS ELEGIDOS EN ORDEN</div>'+near.map((n,i)=>`<div class="dist-row"><span>${i+1}. ${state.mode==='classification'?names()[n.point.c]:'Valor '+n.point.v.toFixed(1)}</span><strong>${n.d.toFixed(2)}</strong></div>`).join('');
-    if(state.step===3){
-      if(state.mode==='classification'){
-        let votes=pred.votes.map((n,i)=>`<div class="vote-row"><span>${names()[i]}</span><div class="vote-track"><div class="vote-fill" style="--vote-width:${100*n/near.length}%;--vote-color:${COLORS[i]}"></div></div><b>${n}</b></div>`).join('');
-        $('stepDetail').innerHTML=`<div class="result-card"><span class="result-dot" style="--result-color:${COLORS[pred.winner]}"></span><div><div class="result-label">PREDICCIÓN POR MAYORÍA</div><div class="result-text">${names()[pred.winner]}</div></div></div>`+votes;
-      }else $('stepDetail').innerHTML=`<div class="result-card"><span class="result-dot" style="--result-color:#11a88f"></span><div><div class="result-label">PROMEDIO DE LOS ${near.length} VECINOS</div><div class="result-text">${pred.value.toFixed(2)} / 10</div></div></div><p class="hint">(${near.map(n=>n.point.v.toFixed(1)).join(' + ')}) / ${near.length} = ${pred.value.toFixed(2)}</p>`;
+    // El estado anterior tenía 0→1→2→3, tres clics para llegar al resultado.
+    // Ahora 0→3 con UN SOLO clic y la información permanece visible al cambiar K.
+    const expanded=state.step===3;
+    $('stepCounter').textContent=expanded?'RESULTADO EN VIVO':'PULSA PARA VER';
+    $('nextStep').textContent=expanded?'Ocultar explicación ↑':'Mostrar explicación completa ↓';
+    $('nextStep').setAttribute('aria-expanded',String(expanded));
+    $('stepDetail').hidden=!expanded;
+    if(!expanded) return;
+
+    // Paso matemático 1: calcular TODAS las distancias y ordenar por proximidad.
+    const all=sortedNeighbors(state.query);
+    const pred=predict(state.query),near=pred.nearest;
+    const radius=getNeighborhood().radius;
+    const first=all[0],q=state.query,p=first.point;
+    const deltas=[(q.x-p.x)**2,(q.y-p.y)**2];
+    if(state.dims===3)deltas.push((q.z-p.z)**2);
+    const formula=`√(${deltas.map(n=>n.toFixed(1)).join(' + ')}) = ${first.d.toFixed(2)}`;
+    const distRows=all.slice(0,5).map((n,i)=>`<div class="dist-row"><span>${i+1}. ${state.mode==='classification'?names()[n.point.c]:'Valor '+n.point.v.toFixed(1)}</span><strong>${n.d.toFixed(2)}</strong></div>`).join('');
+
+    // Paso matemático 2: ordenar las distancias y escoger exactamente K muestras.
+    // Se muestran todos los vecinos elegidos, aunque K valga 15.
+    const nearRows=near.map((n,i)=>`<div class="dist-row"><span>${i+1}. ${state.mode==='classification'?names()[n.point.c]:'Valor '+n.point.v.toFixed(1)}</span><strong>${n.d.toFixed(2)}</strong></div>`).join('');
+
+    // Paso matemático 3: votos por clase o media aritmética (regresión).
+    let predictionHtml;
+    if(state.mode==='classification'){
+      const votes=pred.votes.map((n,i)=>`<div class="vote-row"><span>${names()[i]}</span><div class="vote-track"><div class="vote-fill" style="--vote-width:${100*n/near.length}%;--vote-color:${COLORS[i]}"></div></div><b>${n}</b></div>`).join('');
+      predictionHtml=`<div class="explain-prediction"><div class="result-card"><span class="result-dot" style="--result-color:${COLORS[pred.winner]}"></span><div><div class="result-label">CLASE PREDICHA</div><div class="result-text">${names()[pred.winner]}</div></div></div><div class="explain-votes">${votes}</div></div><p>Un voto por vecino. Si hay empate, decide la suma de distancias y después el índice de la clase.</p>`;
+    }else{
+      const values=near.map(n=>n.point.v.toFixed(1));
+      predictionHtml=`<div class="result-card"><span class="result-dot" style="--result-color:#11a88f"></span><div><div class="result-label">VALOR ESTIMADO</div><div class="result-text">${pred.value.toFixed(2)} / 10</div></div></div><div class="explain-math">(${values.join(' + ')}) / ${near.length} = ${pred.value.toFixed(2)}</div>`;
     }
-    $('nextStep').textContent=['Mostrar distancias →','Seleccionar vecinos →','Mostrar predicción →','↻ Volver a empezar'][state.step];
-    $('prevStep').disabled=state.step===0;
+    // Se montan las tres tarjetas en la misma vista; nunca hay que avanzar.
+    $('stepDetail').innerHTML=`<div class="explain-grid">
+      <article class="explain-stage"><div class="explain-eyebrow">01 · DISTANCIAS</div><h3>Medir distancias en ${state.dims}D</h3><p>Calculamos la distancia a los <strong>${all.length} ejemplos</strong>. Ejemplo con el más próximo:</p><div class="explain-math">d = ${formula}</div><p>Los 5 más próximos:</p>${distRows}<p>Escala normalizada de 0 a 100.</p></article>
+      <article class="explain-stage"><div class="explain-eyebrow">02 · VECINOS</div><h3>Seleccionar K = ${near.length}</h3><p>Ordenamos por distancia y elegimos estos ${near.length} puntos. El círculo (2D) o esfera (3D) llega hasta el último vecino elegido.</p><div class="radius-note">Radio = distancia al vecino ${near.length}: <strong>${radius.toFixed(2)}</strong></div><div class="explain-neighbors">${nearRows}</div></article>
+      <article class="explain-stage"><div class="explain-eyebrow">03 · PREDICCIÓN</div><h3>${state.mode==='classification'?'Votación mayoritaria':'Promedio de los vecinos'}</h3>${predictionHtml}</article>
+    </div>`;
   }
   function renderUI(){
     const iris=state.scenario==='iris',three=state.dims===3,cls=state.mode==='classification';
@@ -332,6 +442,12 @@
     $('kValue').textContent=state.k;$('kSlider').max=Math.min(15,state.points.length);$('kSlider').value=state.k;
     $('kHint').textContent=state.k<=3?'K pequeño: fronteras detalladas y sensibilidad al ruido.':state.k>=10?'K grande: las predicciones tienden a ser menos locales.':'K intermedio: varios vecinos comparten la decisión.';
     $('areasToggle').checked=state.showAreas;$('boundaryToggle').checked=state.showBorders;$('boundaryToggle').disabled=!cls;
+    $('neighborhoodToggle').checked=state.showNeighborhood;
+    const neighborhood=getNeighborhood();
+    $('neighborhoodInfo').textContent=`${three?'Esfera 3D':'Círculo 2D'} centrado en ? · K = ${neighborhood.count} · radio = ${neighborhood.radius.toFixed(2)} (escala normalizada).`;
+    $('neighborhoodDescription').textContent=three
+      ?'En 3D se considera la distancia real X, Y y Z. Por la perspectiva, algunos puntos fuera de la esfera pueden parecer estar dentro.'
+      :'El contorno llega hasta el K-ésimo vecino. Cambia K o mueve ? y el radio se recalcula automáticamente.';
     $('areasLabel').textContent=cls?'Colorear regiones predichas':'Colorear valores estimados';
     $('boundaryIndicator').hidden=!cls||!state.showBorders;
     $('boundary3DControls').hidden=!three;$('boundary3DMode').value=state.boundary3D;
@@ -348,6 +464,8 @@
     $('canvasHint').textContent=three?'Arrastra para rotar · usa los controles X, Y, Z':'Arrastra ? o los ejemplos · clic para mover ?';
     $('queryHint').textContent=iris?'Los controles representan centímetros reales; internamente se normalizan.':three?'En 3D cambia X, Y y Z con los deslizadores.':'En 2D también puedes mover ? directamente con el ratón.';
     $('chartStatus').textContent=`● ${cls?state.classCount+' clases':'Regresión'} · ${state.dims}D`;
+    canvas.classList.toggle('is-2d',!three);
+    canvas.classList.toggle('is-3d',three);
     $('axisInfo').textContent=iris?'X = longitud pétalo (cm) · Y = anchura pétalo (cm) · Z = longitud sépalo (cm)':'X = característica 1 · Y = característica 2 · Z = característica 3';
     $('formulaExplanation').innerHTML=three?'En <strong>3D</strong>: d = √(Δx² + Δy² + Δz²). La tercera característica afecta a los vecinos.':'En <strong>2D</strong>: d = √(Δx² + Δy²). Sólo comparamos dos características.';
     $('teacherTip').innerHTML=iris?'<strong>Ejemplo para clase:</strong> tenemos una flor nueva con medidas 4,7 cm de pétalo, 1,4 cm de anchura y 6,1 cm de sépalo. Prueba K = 1 y K = 9, activa 3D y descubre si la especie predicha cambia.':'<strong>Pregunta para clase:</strong> compara K = 1 con K = 11. ¿Cómo cambian las regiones? Activa 3D y mueve Z: ¿podría cambiar la etiqueta al añadir una tercera característica?';
@@ -356,14 +474,14 @@
 
   // G1. Cambio de escenario, dimensionalidad y modos.
   function scenario(which){
-    state.scenario=which;state.step=0;state.tool='move';
+    state.scenario=which;state.tool='move';
     if(which==='iris'){state.mode='classification';state.classCount=3;state.k=5;makeIris();}
     else{state.classCount=3;state.k=5;makeFree();}
     resetQuery();renderUI();
   }
-  function dims(d){state.dims=d;state.step=0;invalidate();renderUI();}
+  function dims(d){state.dims=d;invalidate();renderUI();}
   function changeK(k){state.k=clamp(k,1,Math.min(15,state.points.length));invalidate();renderUI();}
-  function reset(){Object.assign(state,{scenario:'free',mode:'classification',dims:2,classCount:3,k:5,step:0,showAreas:true,showBorders:true,boundary3D:'slice',tool:'move',selectedClass:0,seed:3,yaw:-.74,pitch:.43,zoom:1});resetQuery();makeFree();renderUI();}
+  function reset(){Object.assign(state,{scenario:'free',mode:'classification',dims:2,classCount:3,k:5,step:0,showAreas:true,showBorders:true,showNeighborhood:true,boundary3D:'slice',tool:'move',selectedClass:0,seed:3,yaw:-.74,pitch:.43,zoom:1});resetQuery();makeFree();renderUI();}
 
   // G2. Ratón / táctil. En 2D se pueden mover puntos; en 3D se gira la cámara.
   function mouse(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
@@ -419,12 +537,13 @@
   $('irisBtn').addEventListener('click',()=>scenario('iris'));
   $('view2DBtn').addEventListener('click',()=>dims(2));
   $('view3DBtn').addEventListener('click',()=>dims(3));
-  $('classificationBtn').addEventListener('click',()=>{state.mode='classification';state.step=0;invalidate();renderUI();});
-  $('regressionBtn').addEventListener('click',()=>{if(state.scenario==='iris')return;state.mode='regression';state.step=0;invalidate();renderUI();});
-  $('classSelect').addEventListener('change',e=>{if(state.scenario==='iris')return;state.classCount=+e.target.value;state.step=0;state.selectedClass=0;makeFree();renderUI();});
+  $('classificationBtn').addEventListener('click',()=>{state.mode='classification';invalidate();renderUI();});
+  $('regressionBtn').addEventListener('click',()=>{if(state.scenario==='iris')return;state.mode='regression';invalidate();renderUI();});
+  $('classSelect').addEventListener('change',e=>{if(state.scenario==='iris')return;state.classCount=+e.target.value;state.selectedClass=0;makeFree();renderUI();});
   $('kSlider').addEventListener('input',e=>changeK(+e.target.value));
   $('areasToggle').addEventListener('change',e=>{state.showAreas=e.target.checked;invalidate();renderUI();});
   $('boundaryToggle').addEventListener('change',e=>{state.showBorders=e.target.checked;invalidate();renderUI();});
+  $('neighborhoodToggle').addEventListener('change',e=>{state.showNeighborhood=e.target.checked;renderUI();});
   $('boundary3DMode').addEventListener('change',e=>{state.boundary3D=e.target.value;invalidate();renderUI();});
   $('sliceZ').addEventListener('input',e=>{state.sliceZ=+e.target.value;sliceCache=null;renderCoords();queueDraw();});
   ['X','Y','Z'].forEach(axis=>{$('query'+axis).addEventListener('input',e=>{state.query[axis.toLowerCase()]=+e.target.value;renderCoords();renderSteps();queueDraw();});});
@@ -432,9 +551,9 @@
   $('moveTool').addEventListener('click',()=>{state.tool='move';renderUI();});
   $('addTool').addEventListener('click',()=>{state.tool='add';renderUI();});
   $('undoButton').addEventListener('click',()=>{let i=state.points.findLastIndex(p=>p.custom);if(i>=0)state.points.splice(i,1);invalidate();renderUI();});
-  $('shuffleButton').addEventListener('click',()=>{state.seed++;state.step=0;makeFree();renderUI();});
-  $('nextStep').addEventListener('click',()=>{state.step=state.step===3?0:state.step+1;renderUI();});
-  $('prevStep').addEventListener('click',()=>{state.step=Math.max(0,state.step-1);renderUI();});
+  $('shuffleButton').addEventListener('click',()=>{state.seed++;makeFree();renderUI();});
+  // ÚNICO BOTÓN: muestra/oculta los 3 pasos al mismo tiempo.
+  $('nextStep').addEventListener('click',()=>{state.step=state.step===3?0:3;renderUI();});
   $('resetButton').addEventListener('click',reset);
   $('resetCameraButton').addEventListener('click',()=>{state.yaw=-.74;state.pitch=.43;state.zoom=1;queueDraw();});
 
@@ -445,5 +564,5 @@
   if(window.ResizeObserver)new ResizeObserver(resize).observe(canvas);else window.addEventListener('resize',resize);
   resize();
   // API para demostrar y probar el algoritmo en consola del navegador.
-  window.KNN_DEMO={state,predict,sortedNeighbors,changeK,dims,scenario,reset};
+  window.KNN_DEMO={state,predict,sortedNeighbors,getNeighborhood,changeK,dims,scenario,reset};
 })();

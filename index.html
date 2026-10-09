@@ -26,6 +26,9 @@
   </div>
 
   <div class="workspace">
+    <!-- Columna visual: gráfico, explicación instantánea y teoría breve.
+         Al estar juntos, el contenido ocupa el espacio que antes quedaba vacío. -->
+    <div class="visual-column">
     <!-- 3. VISUALIZACIÓN. Canvas 2D dibuja un gráfico bidimensional o una proyección de un espacio de 3 variables. -->
     <section class="panel graph-panel" aria-labelledby="graphTitle">
       <div class="panel-heading">
@@ -39,11 +42,34 @@
         <div id="tooltip" class="tooltip" role="status"></div>
       </div>
       <div class="graph-footer">
-        <span>El punto <strong>?</strong> es un dato sin etiqueta. Los círculos de color son ejemplos conocidos.</span>
+        <span>El punto <strong>?</strong> es un dato nuevo. El contorno violeta marca los <strong>K vecinos</strong> considerados.</span>
         <span id="boundaryIndicator" class="boundary-indicator"><i></i> Frontera activa</span>
       </div>
       <div id="axisInfo" class="axis-info">X: característica 1 · Y: característica 2</div>
     </section>
+
+    <!-- 5. EXPLICACIÓN CON UN CLIC: distancias, K vecinos y predicción se
+         muestran SIMULTÁNEAMENTE sin pasar por pantallas intermedias. -->
+    <section class="panel explanation-panel" aria-labelledby="explanationHeading">
+      <div class="explanation-top">
+        <div>
+          <div class="eyebrow">ASÍ FUNCIONA KNN</div>
+          <h2 id="explanationHeading">La predicción, de un vistazo</h2>
+          <p class="hint">Las tres operaciones aparecen juntas. Cambia K o mueve el punto para recalcularlas.</p>
+        </div>
+        <span class="explanation-tag" id="stepCounter">SIN CALCULAR</span>
+      </div>
+      <button id="nextStep" class="primary-button explanation-trigger" type="button" aria-expanded="false" aria-controls="stepDetail">Mostrar explicación completa ↓</button>
+      <div id="stepDetail" class="step-detail" aria-live="polite" hidden></div>
+    </section>
+
+    <!-- Recordatorios teóricos que ahora rellenan la columna del gráfico. -->
+    <section class="concepts" aria-label="Tres operaciones de KNN">
+      <article class="concept"><span class="concept-number">01</span><h3>Distancias</h3><p id="formulaExplanation">En 2D: d = √(Δx² + Δy²). En 3D añadimos Δz². Para Iris usamos variables normalizadas.</p></article>
+      <article class="concept"><span class="concept-number">02</span><h3>Vecinos</h3><p>Se comparan las distancias con <strong>todos</strong> los ejemplos y se seleccionan los K más próximos.</p></article>
+      <article class="concept"><span class="concept-number">03</span><h3>Predicción</h3><p>Clasificación: gana la clase con más votos. Regresión: se obtiene la media de los valores de los vecinos.</p></article>
+    </section>
+    </div>
 
     <!-- 4. PANEL DE CONTROL. Todos los elementos tienen eventos en app.js. -->
     <section class="panel controls-panel" aria-label="Controles de KNN">
@@ -85,7 +111,11 @@
         <p id="kHint" class="hint strong-hint">K pequeño: decisiones locales. K grande: el contexto importa más.</p>
       </div>
       <div class="control-section view-section">
-        <div class="section-heading">Regiones y fronteras</div>
+        <div class="section-heading">Regiones, vecinos y fronteras</div>
+        <!-- El círculo/esfera usa d_K: distancia exacta al K-ésimo vecino. -->
+        <label class="check-row neighborhood-switch"><span>Mostrar círculo de los K vecinos</span><input id="neighborhoodToggle" type="checkbox" checked></label>
+        <p id="neighborhoodInfo" class="radius-information" aria-live="polite">Círculo 2D · K = 5</p>
+        <p id="neighborhoodDescription" class="hint neighborhood-description">Su radio cambia al elegir otro K o mover el dato nuevo.</p>
         <label class="check-row"><span id="areasLabel">Colorear regiones predichas</span><input id="areasToggle" type="checkbox" checked></label>
         <label class="check-row"><span>Mostrar frontera de decisión</span><input id="boundaryToggle" type="checkbox" checked></label>
         <div id="boundary3DControls" hidden>
@@ -109,22 +139,9 @@
         <div class="coordinate-row" id="addZRow" hidden><label for="addZ">Z nuevo</label><input id="addZ" type="range" min="0" max="100" step="1" value="50"><output id="addZValue">50</output></div>
         <div class="action-row"><button id="undoButton" class="text-button" disabled>↶ Deshacer añadido</button><button id="shuffleButton" class="text-button">↻ Nuevos ejemplos</button></div>
       </div>
-      <!-- 5. RECORRIDO DIDÁCTICO: cálculo, vecinos y votación, con números reales. -->
-      <div class="control-section walkthrough">
-        <div class="step-line"><span>Explicar paso a paso</span><b id="stepCounter">0 / 3</b></div>
-        <div class="step-progress" id="stepProgress"><span></span><span></span><span></span></div>
-        <div class="step-card" aria-live="polite"><div id="stepLabel" class="step-label">PUNTO DE PARTIDA</div><h3 id="stepTitle">¿Quién es el vecino más cercano?</h3><p id="stepDescription">KNN aprende de ejemplos etiquetados.</p></div>
-        <div id="stepDetail" class="step-detail" aria-live="polite"></div>
-        <div class="step-actions"><button id="nextStep" class="primary-button">Mostrar distancias →</button><button id="prevStep" class="secondary-button" disabled>← Atrás</button></div>
-      </div>
       <button id="resetButton" class="reset-button">↺ Restablecer demostración</button>
     </section>
   </div>
-  <section class="concepts" aria-label="Tres pasos de KNN">
-    <article class="concept"><span class="concept-number">01</span><h3>Distancias</h3><p id="formulaExplanation">En 2D: d = √(Δx² + Δy²). En 3D añadimos Δz². Para Iris usamos variables normalizadas.</p></article>
-    <article class="concept"><span class="concept-number">02</span><h3>Vecinos</h3><p>Se comparan las distancias con <strong>todos</strong> los ejemplos y se seleccionan los K más próximos.</p></article>
-    <article class="concept"><span class="concept-number">03</span><h3>Predicción</h3><p>Clasificación: gana la clase con más votos. Regresión: se obtiene la media de los valores de los vecinos.</p></article>
-  </section>
   <p id="teacherTip" class="teacher-tip"><strong>Pregunta para clase:</strong> compara K = 1 con K = 11. ¿Cómo cambian las regiones? Activa 3D y mueve Z para demostrar que una tercera variable puede cambiar los vecinos.</p>
 </main>
 <!-- 6. JS separado y comentado; no requiere librerías de terceros. -->
